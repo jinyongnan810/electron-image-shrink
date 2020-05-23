@@ -1,9 +1,22 @@
-const { app, BrowserWindow, Menu, globalShortcut } = require('electron')
+const path = require('path')
+const os = require('os')
+const { app, BrowserWindow, Menu, globalShortcut, ipcMain, shell } = require('electron')
 // app controls total lifecycle
 // BrowserWindow creates windows
+// Menu to create custom menu
+// globalShortcut to create global shortcuts
+// ipcMain is the main process to react to ipcRenderer
+// shell to open folder
+const imagemin = require('imagemin')
+const imagemin_mozjpeg = require('imagemin-mozjpeg')
+const imagemin_pngquant = require('imagemin-pngquant')
+const slash = require('slash')
+const logger = require('electron-log')
+
+
 
 // environment
-process.env.NODE_ENV = 'development'
+process.env.NODE_ENV = 'production'//'development'
 const is_dev = process.env.NODE_ENV !== 'production'
 const is_mac = process.platform === 'darwin'
 
@@ -14,11 +27,14 @@ let aboutWindow
 const createMainWindow = () => {
     mainWindow = new BrowserWindow({
         title: 'Image Shrink',
-        icon: './assets/icons/Icon_256x256.png',
+        icon: `${__dirname}/assets/icons/Icon_256x256.png`,
         width: 500,
         height: 600,
         resizable: is_dev ? true : false,
-        backgroundColor: 'white' // prevent get dark when toggle dev tools
+        backgroundColor: 'white', // prevent get dark when toggle dev tools
+        webPreferences: {
+            nodeIntegration: true // allow using node modules in the js
+        }
     })
     // load url
     // mainWindow.loadURL('https://twitter.com')
@@ -29,7 +45,7 @@ const createMainWindow = () => {
 const createAboutWindow = () => {
     aboutWindow = new BrowserWindow({
         title: 'About Image Shrink',
-        icon: './assets/icons/Icon_256x256.png',
+        icon: `${__dirname}/assets/icons/Icon_256x256.png`,
         width: 300,
         height: 300,
         resizable: false,
@@ -65,7 +81,9 @@ const menu = [
             {
                 label: 'About',
                 click: createAboutWindow
-            }
+            },
+            { type: 'separator' },
+            { role: 'quit' }
         ]
 
     }] : []),
@@ -104,6 +122,35 @@ const menu = [
     //     ]
     // }
 ]
+
+// the main process
+ipcMain.on('image:scale', (e, options) => {
+    options.dest = path.join(os.homedir(), 'imageshrink')
+    // shrink image 
+    shrinkImage(options)
+})
+
+// imagemin
+const shrinkImage = async ({ imgPath, quality, dest }) => {
+    try {
+        const pngQuality = quality / 100.0
+        const files = await imagemin([slash(imgPath)], {
+            destination: dest,
+            plugins: [
+                imagemin_mozjpeg({ quality }),
+                imagemin_pngquant({ quality: [pngQuality, pngQuality] })
+            ]
+        })
+        // open dest folder
+        shell.openPath(dest)
+        // send back success alert
+        mainWindow.webContents.send('image:done')
+        logger.info(files)// log show in /Users/kin/Library/Logs/image-shrink/main.log
+    } catch (err) {
+        console.log(err.message)
+        logger.error(err.message)
+    }
+}
 
 // quit when all window closed except on mac
 app.on('window-all-closed', () => {
