@@ -1,0 +1,14 @@
+{
+  "name": "image-shrink",
+  "version": "1.0.0",
+  "description": "shrink image using electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "kinn",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^9.0.0"
+  }
+}
